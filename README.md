@@ -177,6 +177,16 @@ duress_sign --remove ~/.duress/wipe_data.sh
 | `wipe_data.sh` | Securely delete sensitive files/directories, clear browser history, empty trash |
 | `factory_reset.sh` | Full factory reset: wipe all user data, uninstall third-party apps and Homebrew packages (phase 1) + erase APFS data volume and reboot with passwordless sudo (phase 2) |
 | `send_alert.sh` | Send duress alerts via webhook/email (with IP and location info) |
+
+> **`factory_reset.sh` — Passwordless sudo setup**
+>
+> Phase 2 (system-level reset: erase data volume, remove `/Applications` third-party apps, reboot) only runs when the user has passwordless sudo. To enable it, run `sudo visudo` and add the following line at the end:
+>
+> ```
+> your_username ALL=(ALL) NOPASSWD: ALL
+> ```
+>
+> Replace `your_username` with your actual macOS username. Without this, only phase 1 (user-level cleanup) will execute.
 | `lock_keychain.sh` | Lock the macOS Keychain |
 
 ## Uninstall

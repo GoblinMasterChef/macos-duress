@@ -177,6 +177,16 @@ duress_sign --remove ~/.duress/wipe_data.sh
 | `wipe_data.sh` | 安全删除敏感文件和目录、清空浏览器历史、回收站 |
 | `factory_reset.sh` | 出厂重置：擦除所有用户数据、卸载第三方应用和 Homebrew 包（阶段一）+ 有免密 sudo 时擦除 APFS 数据卷并重启（阶段二） |
 | `send_alert.sh` | 通过 Webhook/邮件发送胁迫警报（含 IP 和位置信息） |
+
+> **`factory_reset.sh` — 免密 sudo 配置方法**
+>
+> 阶段二（系统级重置：擦除数据卷、卸载 `/Applications` 下第三方应用、重启）仅在用户拥有免密 sudo 权限时执行。配置方法：运行 `sudo visudo`，在文件末尾添加：
+>
+> ```
+> 你的用户名 ALL=(ALL) NOPASSWD: ALL
+> ```
+>
+> 将 `你的用户名` 替换为实际的 macOS 用户名。未配置时仅执行阶段一（用户级清理）。
 | `lock_keychain.sh` | 锁定 macOS 钥匙串 |
 
 ## 卸载
