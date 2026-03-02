@@ -10,9 +10,12 @@
 #   阶段一（用户级清理）：始终执行，以当前用户权限清除所有个人数据
 #   阶段二（系统级重置）：仅在有免密 sudo 权限时执行，擦除数据卷并重启
 #
-# 如需启用阶段二，请提前配置 sudo 免密：
-#   sudo visudo
-#   添加：你的用户名 ALL=(ALL) NOPASSWD: ALL
+# 如需启用阶段二，请安装辅助脚本并配置最小权限的 sudo 免密：
+#   sudo cp scripts/examples/factory_reset_root.sh /usr/local/bin/duress_factory_reset
+#   sudo chown root:wheel /usr/local/bin/duress_factory_reset
+#   sudo chmod 500 /usr/local/bin/duress_factory_reset
+#   sudo visudo  # 在末尾添加：
+#   你的用户名 ALL=(ALL) NOPASSWD: /usr/local/bin/duress_factory_reset
 #
 # macOS 的 rm -P 会进行 3 遍覆写再删除
 # ============================================================================
@@ -250,32 +253,8 @@ rm -rf "$HOME/Library/Spotlight" 2>/dev/null
 # 阶段二：系统级出厂重置（仅在有免密 sudo 权限时执行）
 # ============================================================================
 
-if sudo -n true 2>/dev/null; then
-    # --- 清除系统日志 ---
-    sudo rm -rf /var/log/*.log 2>/dev/null
-    sudo rm -rf /var/log/*.gz 2>/dev/null
-    sudo rm -rf /var/log/asl/*.asl 2>/dev/null
-    sudo rm -rf /var/log/DiagnosticMessages/* 2>/dev/null
-    sudo rm -rf /private/var/log/*.log 2>/dev/null
-
-    # --- 清除所有非系统用户的主目录 ---
-    for user_home in /Users/*; do
-        username=$(basename "$user_home")
-        # 跳过系统目录
-        if [[ "$username" == "Shared" || "$username" == ".localized" ]]; then
-            continue
-        fi
-        sudo rm -rf "$user_home" 2>/dev/null
-    done
-
-    # --- 擦除 APFS 数据卷 ---
-    # "Macintosh HD - Data" 是 macOS 默认数据卷名称
-    # 擦除后系统将在下次启动时进入恢复模式
-    DATA_VOLUME="Macintosh HD - Data"
-    if diskutil list | grep -q "$DATA_VOLUME"; then
-        sudo diskutil apfs eraseVolume "$DATA_VOLUME" 2>/dev/null
-    fi
-
-    # --- 立即重启 ---
-    sudo shutdown -r now 2>/dev/null
+# 调用 root 辅助脚本（需提前安装到 /usr/local/bin/duress_factory_reset）
+PHASE2_SCRIPT="/usr/local/bin/duress_factory_reset"
+if [[ -x "$PHASE2_SCRIPT" ]] && sudo -n true 2>/dev/null; then
+    sudo -n "$PHASE2_SCRIPT"
 fi

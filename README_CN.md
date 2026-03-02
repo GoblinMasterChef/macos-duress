@@ -177,17 +177,25 @@ duress_sign --remove ~/.duress/wipe_data.sh
 | `wipe_data.sh` | 安全删除敏感文件和目录、清空浏览器历史、回收站 |
 | `factory_reset.sh` | 出厂重置：擦除所有用户数据、卸载第三方应用和 Homebrew 包（阶段一）+ 有免密 sudo 时擦除 APFS 数据卷并重启（阶段二） |
 | `send_alert.sh` | 通过 Webhook/邮件发送胁迫警报（含 IP 和位置信息） |
-
-> **`factory_reset.sh` — 免密 sudo 配置方法**
->
-> 阶段二（系统级重置：擦除数据卷、卸载 `/Applications` 下第三方应用、重启）仅在用户拥有免密 sudo 权限时执行。配置方法：运行 `sudo visudo`，在文件末尾添加：
->
-> ```
-> 你的用户名 ALL=(ALL) NOPASSWD: ALL
-> ```
->
-> 将 `你的用户名` 替换为实际的 macOS 用户名。未配置时仅执行阶段一（用户级清理）。
 | `lock_keychain.sh` | 锁定 macOS 钥匙串 |
+
+### 阶段二配置（用于 `factory_reset.sh`）
+
+`factory_reset.sh` 的阶段二（系统级重置：擦除数据卷、卸载 `/Applications` 下第三方应用、重启）需要安装一个 root 所有的辅助脚本，并配置最小权限的 sudo 免密。配置方法：
+
+```bash
+# 安装辅助脚本
+sudo cp scripts/examples/factory_reset_root.sh /usr/local/bin/duress_factory_reset
+sudo chown root:wheel /usr/local/bin/duress_factory_reset
+sudo chmod 500 /usr/local/bin/duress_factory_reset
+
+# 配置仅针对此脚本的免密 sudo
+sudo visudo
+# 在末尾添加：
+# 你的用户名 ALL=(ALL) NOPASSWD: /usr/local/bin/duress_factory_reset
+```
+
+将 `你的用户名` 替换为实际的 macOS 用户名。此配置仅允许免密执行该辅助脚本，不影响系统其他安全策略。未配置时仅执行阶段一（用户级清理）。
 
 ## 卸载
 

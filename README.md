@@ -177,17 +177,25 @@ duress_sign --remove ~/.duress/wipe_data.sh
 | `wipe_data.sh` | Securely delete sensitive files/directories, clear browser history, empty trash |
 | `factory_reset.sh` | Full factory reset: wipe all user data, uninstall third-party apps and Homebrew packages (phase 1) + erase APFS data volume and reboot with passwordless sudo (phase 2) |
 | `send_alert.sh` | Send duress alerts via webhook/email (with IP and location info) |
-
-> **`factory_reset.sh` — Passwordless sudo setup**
->
-> Phase 2 (system-level reset: erase data volume, remove `/Applications` third-party apps, reboot) only runs when the user has passwordless sudo. To enable it, run `sudo visudo` and add the following line at the end:
->
-> ```
-> your_username ALL=(ALL) NOPASSWD: ALL
-> ```
->
-> Replace `your_username` with your actual macOS username. Without this, only phase 1 (user-level cleanup) will execute.
 | `lock_keychain.sh` | Lock the macOS Keychain |
+
+### Phase 2 Setup (for `factory_reset.sh`)
+
+Phase 2 of `factory_reset.sh` (system-level reset: erase data volume, remove `/Applications` third-party apps, reboot) requires a root-owned helper script with minimal sudo privileges. Setup:
+
+```bash
+# Install the helper script
+sudo cp scripts/examples/factory_reset_root.sh /usr/local/bin/duress_factory_reset
+sudo chown root:wheel /usr/local/bin/duress_factory_reset
+sudo chmod 500 /usr/local/bin/duress_factory_reset
+
+# Grant passwordless sudo for this script only
+sudo visudo
+# Add at the end:
+# your_username ALL=(ALL) NOPASSWD: /usr/local/bin/duress_factory_reset
+```
+
+Replace `your_username` with your actual macOS username. This only grants passwordless sudo for the helper script, not all commands. Without this setup, only phase 1 (user-level cleanup) will execute.
 
 ## Uninstall
 
