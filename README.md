@@ -200,6 +200,16 @@ sudo ./uninstall.sh
 - 使用 `timingsafe_bcmp()` 防止时序攻击
 - 编译为 universal binary (x86_64 + arm64)
 
+## 参考项目
+
+本项目的设计思路参考了以下开源项目：
+
+- [nuvious/pam-duress](https://github.com/nuvious/pam-duress) — Linux PAM 胁迫密码模块，支持用户级和全局级胁迫脚本，密码验证后透明进入用户 shell。本项目的签名机制 `SHA256(密码 + 脚本内容)` 和双层目录结构（用户/系统）参考了该项目的设计。
+- [rafket/pam_duress](https://github.com/rafket/pam_duress) — 另一个 Linux PAM 胁迫密码模块的 C 语言实现，提供了胁迫密码触发任意操作（发送邮件、删除文件等）的基础架构。
+- [jcs/login_duress](https://github.com/jcs/login_duress) — BSD 认证模块的胁迫密码实现，将胁迫密码概念从 PAM 扩展到 BSD auth 框架。
+
+本项目在上述项目基础上针对 macOS 进行了适配（使用 CommonCrypto、`-bundle` 编译、OpenPAM 接口），并新增了解锁模式和自毁模式。
+
 ## 许可证
 
 MIT License
