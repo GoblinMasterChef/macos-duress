@@ -1,215 +1,217 @@
-# macOS 胁迫密码插件 (pam_duress)
+English | [中文](README_CN.md)
 
-当你被胁迫解锁 macOS 时，输入预设的"胁迫密码"可以在后台静默执行保护脚本（清除敏感数据、发送警报等），而对胁迫者来说，解锁失败表现完全正常。
+# macOS Duress Password Plugin (pam_duress)
 
-支持三种模式：
-- **普通模式**：脚本在后台执行，解锁失败（默认行为）
-- **解锁模式**：脚本同步执行完毕后正常解锁进入系统（适用于需要看起来一切正常的场景）
-- **自毁模式**：脚本同步执行完毕后，自动卸载 pam_duress 并清除所有痕迹，然后正常解锁进入系统
+When coerced into unlocking your macOS, entering a pre-configured "duress password" silently executes protective scripts in the background (wiping sensitive data, sending alerts, etc.), while the unlock failure appears completely normal to the coercer.
 
-## 工作原理
+Three modes are supported:
+- **Normal mode**: Scripts run in the background, unlock fails (default)
+- **Unlock mode**: Scripts run synchronously, then the system unlocks normally (for scenarios where everything needs to appear normal)
+- **Self-destruct mode**: Scripts run synchronously, then pam_duress is automatically uninstalled and all traces are removed, followed by a normal unlock
 
-本插件是一个 macOS PAM (Pluggable Authentication Module) 模块：
+## How It Works
 
-1. 用户在锁屏/sudo/终端登录时输入密码
-2. `pam_duress` 模块检查密码是否匹配任何预设的胁迫密码
-3. 如果匹配：
-   - **普通模式**：后台 fork 执行脚本 → 返回 `PAM_IGNORE` → 解锁失败
-   - **解锁模式**：同步等待脚本执行完毕 → 返回 `PAM_SUCCESS` → 正常解锁进入系统
-   - **自毁模式**：同步执行脚本 → 清除所有 pam_duress 痕迹 → 返回 `PAM_SUCCESS` → 正常解锁
-4. 如无匹配 → 返回 `PAM_IGNORE`，交给后续 PAM 模块正常认证
+This plugin is a macOS PAM (Pluggable Authentication Module):
 
-密码验证使用 `SHA256(密码 + 脚本内容)` 签名机制，修改脚本内容会使签名失效（防篡改）。
+1. User enters a password at lock screen / sudo / terminal login
+2. The `pam_duress` module checks if the password matches any pre-configured duress password
+3. If matched:
+   - **Normal mode**: Fork and execute script in background → return `PAM_IGNORE` → unlock fails
+   - **Unlock mode**: Execute script synchronously → return `PAM_SUCCESS` → system unlocks
+   - **Self-destruct mode**: Execute script synchronously → remove all pam_duress traces → return `PAM_SUCCESS` → system unlocks
+4. If no match → return `PAM_IGNORE`, hand off to subsequent PAM modules for normal authentication
 
-### 多脚本与密码匹配规则
+Password verification uses a `SHA256(password + script_content)` signature mechanism. Modifying the script content invalidates the signature (tamper-proof).
 
-**多个脚本绑定同一个密码时，所有匹配的脚本都会被执行**，最终的认证结果由优先级最高的模式决定：
+### Multi-Script and Password Matching Rules
 
-| 优先级 | 模式 | 执行方式 | 返回值 |
-|-------|------|---------|--------|
-| 3（最高） | 自毁 | 同步执行 | `PAM_SUCCESS` |
-| 2 | 解锁 | 同步执行 | `PAM_SUCCESS` |
-| 1（最低） | 普通 | 后台执行 | `PAM_IGNORE` |
+**When multiple scripts are bound to the same password, all matching scripts will be executed.** The final authentication result is determined by the highest-priority mode:
 
-例如，同一密码绑定了 3 个脚本（普通 + 解锁 + 自毁），输入该密码后：
-1. 普通模式脚本 → 后台 fork 执行（不等待）
-2. 解锁模式脚本 → 同步执行（等待完成）
-3. 自毁模式脚本 → 同步执行（等待完成）
-4. 最高优先级为自毁（3）→ 执行自毁清理 → 返回 `PAM_SUCCESS` → 正常解锁
+| Priority | Mode | Execution | Return Value |
+|----------|------|-----------|-------------|
+| 3 (highest) | Self-destruct | Synchronous | `PAM_SUCCESS` |
+| 2 | Unlock | Synchronous | `PAM_SUCCESS` |
+| 1 (lowest) | Normal | Background | `PAM_IGNORE` |
 
-**脚本被修改后**，由于签名是 `SHA256(密码 + 脚本内容)`，修改后的内容会导致计算出的签名与存储的签名不匹配。该脚本会被静默跳过——不执行、不报错、不记录日志，如同不存在。需要用 `duress_sign` 重新绑定密码才能恢复。
+For example, if the same password is bound to 3 scripts (normal + unlock + self-destruct), entering that password will:
+1. Normal mode script → fork and execute in background (no wait)
+2. Unlock mode script → execute synchronously (wait for completion)
+3. Self-destruct mode script → execute synchronously (wait for completion)
+4. Highest priority is self-destruct (3) → perform cleanup → return `PAM_SUCCESS` → system unlocks
 
-## 安装
+**If a script is modified**, since the signature is `SHA256(password + script_content)`, the modified content will produce a signature that doesn't match the stored one. The script will be silently skipped — no execution, no errors, no logs, as if it doesn't exist. Use `duress_sign` to re-bind the password to restore functionality.
 
-### 前置要求
+## Installation
 
-- macOS 12+ (Monterey 或更新版本)
-- Xcode 命令行工具：`xcode-select --install`
+### Prerequisites
 
-### 安装步骤
+- macOS 12+ (Monterey or later)
+- Xcode Command Line Tools: `xcode-select --install`
+
+### Install Steps
 
 ```bash
-# 克隆项目
+# Clone the project
 git clone <repo-url> macosduress
 cd macosduress
 
-# 编译并安装（需要 root 权限）
+# Compile and install (requires root)
 sudo ./install.sh
 ```
 
-安装程序会：
-- 编译 universal binary (Intel + Apple Silicon)
-- 安装模块到 `/usr/local/lib/pam/`
-- 备份并修改 PAM 配置文件
-- 安装 `duress_sign` 命令行工具
+The installer will:
+- Compile a universal binary (Intel + Apple Silicon)
+- Install the module to `/usr/local/lib/pam/`
+- Back up and modify PAM configuration files
+- Install the `duress_sign` CLI tool
 
-## 使用方法
+## Usage
 
-### 1. 初始化
+### 1. Initialize
 
 ```bash
 duress_sign --init
 ```
 
-这将创建 `~/.duress/` 目录。
+This creates the `~/.duress/` directory.
 
-### 2. 创建胁迫脚本
+### 2. Create Duress Scripts
 
-可以使用示例脚本或编写自己的脚本：
+Use the example scripts or write your own:
 
 ```bash
-# 使用示例脚本
+# Use an example script
 cp scripts/examples/wipe_data.sh ~/.duress/
 chmod 500 ~/.duress/wipe_data.sh
 
-# 或创建自定义脚本
+# Or create a custom script
 cat > ~/.duress/my_script.sh << 'EOF'
 #!/bin/bash
-# 你的保护操作
+# Your protective actions
 rm -rf ~/Documents/Sensitive/
 EOF
 chmod 500 ~/.duress/my_script.sh
 ```
 
-### 3. 绑定胁迫密码
+### 3. Bind a Duress Password
 
 ```bash
 duress_sign ~/.duress/wipe_data.sh
-# 输入胁迫密码（两次确认）
+# Enter the duress password (twice for confirmation)
 ```
 
-每个脚本可以绑定不同的胁迫密码，也可以多个脚本使用同一个密码。
+Each script can be bound to a different duress password, or multiple scripts can share the same password.
 
-### 4. 设置解锁模式（可选）
+### 4. Set Unlock Mode (Optional)
 
-如果希望胁迫密码触发后脚本执行完毕再**正常解锁进入系统**（而不是解锁失败），可以为脚本设置解锁模式：
+If you want the duress password to **unlock the system normally** after the script finishes (instead of failing), set unlock mode:
 
 ```bash
-# 设置解锁模式
+# Enable unlock mode
 duress_sign --set-unlock ~/.duress/my_script.sh
 
-# 取消解锁模式
+# Disable unlock mode
 duress_sign --unset-unlock ~/.duress/my_script.sh
 ```
 
-设置后，`~/.duress/` 目录下会创建一个 `.unlock` 标记文件：
+After setting, a `.unlock` marker file is created in `~/.duress/`:
 
 ```
 ~/.duress/
-├── wipe_data.sh           # 普通模式：后台执行，解锁失败
+├── wipe_data.sh           # Normal mode: background execution, unlock fails
 ├── wipe_data.sh.sha256
-├── my_script.sh           # 解锁模式：同步执行完毕后解锁
+├── my_script.sh           # Unlock mode: synchronous execution, then unlock
 ├── my_script.sh.sha256
-└── my_script.sh.unlock    # ← 标记文件，存在即为解锁模式
+└── my_script.sh.unlock    # ← marker file, presence indicates unlock mode
 ```
 
-### 5. 设置自毁模式（可选）
+### 5. Set Self-Destruct Mode (Optional)
 
-如果希望胁迫密码触发后，脚本执行完毕后**自动卸载 pam_duress 并清除所有安装痕迹**，然后正常解锁进入系统：
+If you want the duress password to **automatically uninstall pam_duress and remove all installation traces** after the script finishes, then unlock normally:
 
 ```bash
-# 设置自毁模式
+# Enable self-destruct mode
 duress_sign --set-selfdestruct ~/.duress/destroy.sh
 
-# 取消自毁模式
+# Disable self-destruct mode
 duress_sign --unset-selfdestruct ~/.duress/destroy.sh
 ```
 
-> **注意**：自毁模式与解锁模式互斥。设置自毁模式会自动移除解锁标记，反之亦然。
+> **Note**: Self-destruct mode and unlock mode are mutually exclusive. Setting self-destruct automatically removes the unlock marker, and vice versa.
 
-自毁触发后将按以下顺序清理：
-1. 从 PAM 配置文件中移除 pam_duress 相关行
-2. 删除所有用户的 `~/.duress/` 目录
-3. 删除系统目录 `/etc/duress.d/`
-4. 删除安装备份文件
-5. 删除 `pam_duress.so` 和 `duress_sign` 二进制文件
+After self-destruct is triggered, cleanup proceeds in this order:
+1. Remove pam_duress lines from PAM configuration files
+2. Delete all users' `~/.duress/` directories
+3. Delete the system directory `/etc/duress.d/`
+4. Delete installation backup files
+5. Delete `pam_duress.so` and `duress_sign` binaries
 
-目录结构示例：
+Directory structure example:
 
 ```
 ~/.duress/
-├── wipe_data.sh               # 普通模式
+├── wipe_data.sh               # Normal mode
 ├── wipe_data.sh.sha256
-├── destroy.sh                 # 自毁模式：同步执行 → 清理痕迹 → 解锁
+├── destroy.sh                 # Self-destruct: sync execute → cleanup → unlock
 ├── destroy.sh.sha256
-└── destroy.sh.selfdestruct    # ← 自毁标记文件
+└── destroy.sh.selfdestruct    # ← self-destruct marker file
 ```
 
-### 6. 验证和管理
+### 6. Verify and Manage
 
 ```bash
-# 列出所有已配置的脚本（会标注 [解锁] 或 [自毁]）
+# List all configured scripts (shows [unlock] or [self-destruct] markers)
 duress_sign --list
 
-# 验证密码是否正确绑定
+# Verify a password is correctly bound
 duress_sign --verify ~/.duress/wipe_data.sh
 
-# 移除某个脚本的签名（也会清除 .unlock 和 .selfdestruct 标记）
+# Remove a script's signature (also removes .unlock and .selfdestruct markers)
 duress_sign --remove ~/.duress/wipe_data.sh
 ```
 
-## 示例脚本
+## Example Scripts
 
-| 脚本 | 功能 |
-|------|------|
-| `wipe_data.sh` | 安全删除敏感文件和目录、清空浏览器历史、回收站 |
-| `send_alert.sh` | 通过 Webhook/邮件发送胁迫警报（含 IP 和位置信息） |
-| `lock_keychain.sh` | 锁定 macOS 钥匙串 |
+| Script | Function |
+|--------|----------|
+| `wipe_data.sh` | Securely delete sensitive files/directories, clear browser history, empty trash |
+| `send_alert.sh` | Send duress alerts via webhook/email (with IP and location info) |
+| `lock_keychain.sh` | Lock the macOS Keychain |
 
-## 卸载
+## Uninstall
 
 ```bash
 sudo ./uninstall.sh
 ```
 
-## 安全注意事项
+## Security Notes
 
-- **脚本权限**：脚本必须设置为 `0500`（仅所有者可读可执行），不可被其他用户写入
-- **签名完整性**：修改脚本内容后需重新绑定密码
-- **系统更新**：macOS 系统更新可能重置 PAM 配置文件，更新后需重新运行 `sudo ./install.sh`
-- **Touch ID 兼容**：使用 Touch ID 解锁时不会触发胁迫检查（无密码输入）
-- **测试建议**：先用 `sudo` 命令测试，确认正常后再依赖锁屏场景
+- **Script permissions**: Scripts must be set to `0500` (owner read+execute only), not writable by other users
+- **Signature integrity**: Re-bind the password after modifying script content
+- **System updates**: macOS system updates may reset PAM configuration files; re-run `sudo ./install.sh` after updates
+- **Touch ID compatibility**: Touch ID unlock does not trigger duress checks (no password input)
+- **Testing**: Test with `sudo` first to confirm everything works before relying on lock screen scenarios
 
-## 技术细节
+## Technical Details
 
-- PAM 模块以 `auth sufficient` 方式加入认证链
-- 普通模式返回 `PAM_IGNORE`，解锁模式和自毁模式返回 `PAM_SUCCESS`
-- 使用 CommonCrypto (macOS 原生) 进行 SHA-256 计算
-- 普通模式使用 double-fork 后台执行，解锁/自毁模式使用单 fork + waitpid 同步执行
-- 自毁清理使用纯 C 实现（不 fork shell），不写 syslog，单步失败不中断后续清理
-- 使用 `timingsafe_bcmp()` 防止时序攻击
-- 编译为 universal binary (x86_64 + arm64)
+- PAM module is added to the auth chain as `auth sufficient`
+- Normal mode returns `PAM_IGNORE`; unlock and self-destruct modes return `PAM_SUCCESS`
+- Uses CommonCrypto (macOS native) for SHA-256 computation
+- Normal mode uses double-fork for background execution; unlock/self-destruct modes use single fork + waitpid for synchronous execution
+- Self-destruct cleanup is implemented in pure C (no shell fork), writes no syslog, and uses a best-effort strategy (individual step failures don't block subsequent steps)
+- Uses `timingsafe_bcmp()` to prevent timing attacks
+- Compiled as universal binary (x86_64 + arm64)
 
-## 参考项目
+## References
 
-本项目的设计思路参考了以下开源项目：
+This project's design is inspired by the following open-source projects:
 
-- [nuvious/pam-duress](https://github.com/nuvious/pam-duress) — Linux PAM 胁迫密码模块，支持用户级和全局级胁迫脚本，密码验证后透明进入用户 shell。本项目的签名机制 `SHA256(密码 + 脚本内容)` 和双层目录结构（用户/系统）参考了该项目的设计。
-- [rafket/pam_duress](https://github.com/rafket/pam_duress) — 另一个 Linux PAM 胁迫密码模块的 C 语言实现，提供了胁迫密码触发任意操作（发送邮件、删除文件等）的基础架构。
-- [jcs/login_duress](https://github.com/jcs/login_duress) — BSD 认证模块的胁迫密码实现，将胁迫密码概念从 PAM 扩展到 BSD auth 框架。
+- [nuvious/pam-duress](https://github.com/nuvious/pam-duress) — Linux PAM duress password module supporting per-user and global duress scripts with transparent shell access. The signature mechanism `SHA256(password + script_content)` and dual-directory structure (user/system) are based on this project's design.
+- [rafket/pam_duress](https://github.com/rafket/pam_duress) — Another C implementation of a Linux PAM duress password module, providing the foundational architecture for triggering arbitrary actions (sending emails, deleting files, etc.) via duress passwords.
+- [jcs/login_duress](https://github.com/jcs/login_duress) — A BSD authentication module for duress passwords, extending the duress password concept from PAM to the BSD auth framework.
 
-本项目在上述项目基础上针对 macOS 进行了适配（使用 CommonCrypto、`-bundle` 编译、OpenPAM 接口），并新增了解锁模式和自毁模式。
+This project adapts the above for macOS (using CommonCrypto, `-bundle` compilation, OpenPAM interface), and adds unlock mode and self-destruct mode.
 
-## 许可证
+## License
 
 MIT License
