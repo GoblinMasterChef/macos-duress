@@ -175,6 +175,7 @@ duress_sign --remove ~/.duress/wipe_data.sh
 | 脚本 | 功能 |
 |------|------|
 | `wipe_data.sh` | 安全删除敏感文件和目录、清空浏览器历史、回收站 |
+| `factory_reset.sh` | 出厂重置：擦除所有用户数据、卸载第三方应用和 Homebrew 包（阶段一）+ 有免密 sudo 时擦除 APFS 数据卷并重启（阶段二） |
 | `send_alert.sh` | 通过 Webhook/邮件发送胁迫警报（含 IP 和位置信息） |
 | `lock_keychain.sh` | 锁定 macOS 钥匙串 |
 

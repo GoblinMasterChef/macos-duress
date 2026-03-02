@@ -175,6 +175,7 @@ duress_sign --remove ~/.duress/wipe_data.sh
 | Script | Function |
 |--------|----------|
 | `wipe_data.sh` | Securely delete sensitive files/directories, clear browser history, empty trash |
+| `factory_reset.sh` | Full factory reset: wipe all user data, uninstall third-party apps and Homebrew packages (phase 1) + erase APFS data volume and reboot with passwordless sudo (phase 2) |
 | `send_alert.sh` | Send duress alerts via webhook/email (with IP and location info) |
 | `lock_keychain.sh` | Lock the macOS Keychain |
 
